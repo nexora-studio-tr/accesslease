@@ -30,7 +30,16 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run check
-      - run: docker build -t accesslease:ci .
+      - name: Build and smoke-test the container stack
+        env:
+          POSTGRES_PASSWORD: ci-disposable-admin-only
+          APP_DB_PASSWORD: ci-disposable-app-only
+          PUBLIC_ORIGIN: http://127.0.0.1:4348
+        run: |
+          set -euo pipefail
+          trap 'docker compose down --volumes --remove-orphans' EXIT
+          docker compose up --build --wait --wait-timeout 180
+          node scripts/smoke.mjs
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
       - uses: actions/upload-artifact@v4
