@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.png binary
+*.zip binary
+# Preserve upstream license formatting; source whitespace checks remain enabled.
+licenses/** -whitespace

@@ -1,0 +1,19 @@
+name: Beta feedback / Beta geri bildirimi
+description: Help validate real team workflows.
+body:
+  - type: textarea
+    id: workflow
+    attributes:
+      label: What access workflow did you try? / Hangi erişim akışını denedin?
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Setup, preview, approval and expiry results / Kurulum ve akış sonuçları
+    validations:
+      required: true
+  - type: textarea
+    id: improvements
+    attributes:
+      label: Confusing or missing behavior / Belirsiz veya eksik davranış

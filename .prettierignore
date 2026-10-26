@@ -1,0 +1,9 @@
+node_modules
+dist
+web-dist
+artifacts
+test-results
+playwright-report
+package-lock.json
+.env
+PLAN.tr.md

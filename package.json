@@ -1,0 +1,63 @@
+{
+  "name": "@nexora/accesslease",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --import tsx src/main.ts",
+    "web:dev": "vite --host 127.0.0.1",
+    "build": "tsc -p tsconfig.server.json && node scripts/build-web.mjs",
+    "start": "node --env-file-if-exists=.env dist/main.js",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "test": "vitest run",
+    "test:browser": "playwright test",
+    "check": "npm run typecheck && npm run build && npm test",
+    "db:migrate": "node --env-file-if-exists=.env --import tsx src/migrate.ts",
+    "setup": "node scripts/setup.mjs",
+    "package:source": "node scripts/package.mjs",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "notices": "node scripts/notices.mjs",
+    "db:start": "node scripts/db.mjs start",
+    "db:stop": "node scripts/db.mjs stop"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/static": "^10.1.7",
+    "@radix-ui/themes": "^3.2.1",
+    "discord.js": "^14.22.1",
+    "dotenv": "^17.2.3",
+    "fastify": "^5.6.1",
+    "lucide-react": "^0.468.0",
+    "pg": "^8.16.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.58.0",
+    "@types/node": "^24.10.0",
+    "@types/pg": "^8.15.6",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "eslint": "^10.13.0",
+    "fast-check": "^4.3.0",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.0",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
+  }
+}

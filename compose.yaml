@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: accesslease_admin
+      POSTGRES_DB: accesslease
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run npm run setup first}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Run npm run setup first}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/10-accesslease.sh:ro
+    ports:
+      - '127.0.0.1:5448:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U accesslease_admin -d accesslease']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+  app:
+    build: .
+    environment:
+      NODE_ENV: production
+      APP_MODE: ${APP_MODE:-demo}
+      HOST: 0.0.0.0
+      PORT: 4348
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://127.0.0.1:4348}
+      DATABASE_URL: postgresql://accesslease:${APP_DB_PASSWORD}@db:5432/accesslease
+      DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      DISCORD_GUILD_IDS: ${DISCORD_GUILD_IDS:-}
+    ports:
+      - '127.0.0.1:4348:4348'
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+volumes:
+  postgres-data:
