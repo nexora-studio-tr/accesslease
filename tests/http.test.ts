@@ -48,6 +48,56 @@ describe('HTTP trust boundaries / PostgreSQL sessions', () => {
     expect(r.json().status).toBe('ok');
     expect(JSON.stringify(r.json())).not.toContain('DATABASE');
   });
+  it('scopes renewal requests to the holder, current session and strict input', async () => {
+    const o = await login(),
+      g = await world(o);
+    const original = (
+      await f.db.query("SELECT id FROM requests WHERE guild_id=$1 AND status='pending'", [g])
+    ).rows[0]!.id;
+    const preview = await f.engine.preview(g, o.actor, original);
+    await f.engine.approve(g, o.actor, original, preview.hash);
+    await f.engine.tick();
+    const before = (await f.db.query('SELECT expires_at FROM requests WHERE id=$1', [original]))
+      .rows[0]!.expires_at;
+    const request = (s: { cookie: string; csrf: string }, payload: unknown, token = s.csrf) =>
+      app.inject({
+        method: 'POST',
+        url: `/api/w/${g}/requests/${original}/renew`,
+        headers: {
+          host,
+          origin,
+          cookie: s.cookie,
+          'x-csrf-token': token,
+          'content-type': 'application/json',
+        },
+        payload: JSON.stringify(payload),
+      });
+    const body = {
+      durationMinutes: 4320,
+      reason: 'Continue investigating the release with this team.',
+    };
+    expect((await request(o, body)).statusCode).toBe(403);
+    const m = await login(2, o);
+    expect((await request(m, body, 'wrong')).statusCode).toBe(403);
+    expect((await request(m, { ...body, policyId: original })).statusCode).toBe(400);
+    const result = await request(m, body);
+    expect(result.statusCode).toBe(200);
+    const renewed = (await f.db.query('SELECT * FROM requests WHERE id=$1', [result.json().id]))
+      .rows[0]!;
+    expect(renewed).toMatchObject({
+      user_id: m.actor.id,
+      renewal_of: original,
+      status: 'pending',
+      expires_at: null,
+    });
+    expect(
+      (await f.db.query('SELECT expires_at FROM requests WHERE id=$1', [original])).rows[0]!
+        .expires_at,
+    ).toEqual(before);
+    expect((await request(m, body)).statusCode).toBe(409);
+    const foreign = await login();
+    expect((await request(foreign, body)).statusCode).toBe(403);
+  });
   it('serves the built application without exposing private source files', async () => {
     const r = await app.inject({ url: '/', headers: { host } });
     expect(r.statusCode).toBe(200);

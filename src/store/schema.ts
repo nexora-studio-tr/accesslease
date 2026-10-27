@@ -22,6 +22,13 @@ CREATE TABLE IF NOT EXISTS requests (
  FOREIGN KEY(policy_id,guild_id) REFERENCES policies(id,guild_id)
 );
 CREATE INDEX IF NOT EXISTS requests_workspace_time ON requests(guild_id,created_at DESC);
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS renewal_of uuid;
+CREATE UNIQUE INDEX IF NOT EXISTS requests_id_guild ON requests(id,guild_id);
+DO $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='requests_renewal_scope' AND conrelid='requests'::regclass) THEN
+  ALTER TABLE requests ADD CONSTRAINT requests_renewal_scope FOREIGN KEY(renewal_of,guild_id) REFERENCES requests(id,guild_id);
+ END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS requests_expiring ON requests(expires_at) WHERE status IN ('approved','active','revoke_pending');
 CREATE UNIQUE INDEX IF NOT EXISTS requests_pending_user_policy ON requests(guild_id,user_id,policy_id) WHERE status='pending';
 CREATE TABLE IF NOT EXISTS bindings (
@@ -43,4 +50,5 @@ CREATE INDEX IF NOT EXISTS events_workspace_seq ON events(guild_id,sequence DESC
 CREATE TABLE IF NOT EXISTS sessions (token_hash text PRIMARY KEY, user_id text NOT NULL, user_name text NOT NULL, demo_guild_id text REFERENCES workspaces ON DELETE CASCADE, csrf text NOT NULL, expires_at timestamptz NOT NULL);
 CREATE TABLE IF NOT EXISTS oauth_states (state_hash text PRIMARY KEY, expires_at timestamptz NOT NULL);
 INSERT INTO schema_version(version) VALUES(1) ON CONFLICT DO NOTHING;
+INSERT INTO schema_version(version) VALUES(2) ON CONFLICT DO NOTHING;
 `;

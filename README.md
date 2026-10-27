@@ -4,7 +4,7 @@
 
 Temporary Discord access with a reason, an independent approval, an explainable permission preview, and a verified ending.
 
-[Türkçe](README.tr.md) · [Setup](docs/SETUP.en.md) · [Architecture](docs/ARCHITECTURE.md) · [Security](SECURITY.md) · [Validation](docs/VALIDATION.md)
+[Türkçe](README.tr.md) · [Setup](docs/SETUP.en.md) · [Renewals](docs/RENEWALS.md) · [Architecture](docs/ARCHITECTURE.md) · [Security](SECURITY.md) · [Validation](docs/VALIDATION.md)
 
 ![AccessLease ledger with synthetic demo data](docs/images/ledger-en.png)
 
@@ -18,6 +18,7 @@ AccessLease turns that decision into a bounded lease: **request → inspect → 
 
 - **Explain the change:** compare channel visibility, writing and voice permissions before approval, and preview the effect of removal.
 - **Separate requesting from approving:** even a server owner cannot approve their own request.
+- **Review extra time:** a holder can request a linked renewal. Another person must approve it; the original deadline stays in force while review is pending.
 - **Preserve existing access:** do not adopt a pre-existing role; retain a managed role while another valid lease still needs it.
 - **Respect administrator intervention:** observed role removals and permission drift require review rather than silent restoration.
 - **Persist the work:** PostgreSQL-backed jobs, fixed deadlines, retries, restart recovery and explicit uncertain outcomes.

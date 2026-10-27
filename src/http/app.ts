@@ -158,7 +158,7 @@ export async function buildApp(cfg: Config, db: Database, engine: Engine) {
   }
   app.get('/health', async () => {
     await db.query('SELECT 1');
-    return { status: 'ok', version: '0.1.0-alpha.1', mode: cfg.APP_MODE };
+    return { status: 'ok', version: '0.1.0-alpha.2', mode: cfg.APP_MODE };
   });
   app.get('/api/session', async (req) => {
     const s = sessions.get(req);
@@ -313,6 +313,24 @@ export async function buildApp(cfg: Config, db: Database, engine: Engine) {
       scoped.get('/requests/:id/preview', async (req) =>
         engine.preview(guild(req), actor(req), requestId(req)),
       );
+      scoped.post('/requests/:id/renew', async (req) => {
+        const b = z
+          .object({
+            durationMinutes: z.number().int().min(5).max(10080),
+            reason: z.string().trim().min(10).max(500),
+          })
+          .strict()
+          .parse(req.body);
+        return {
+          id: await engine.renew(
+            guild(req),
+            actor(req),
+            requestId(req),
+            b.durationMinutes,
+            b.reason,
+          ),
+        };
+      });
       scoped.post('/requests/:id/approve', async (req) => {
         const b = z
           .object({ previewHash: z.string().regex(/^[a-f0-9]{64}$/) })

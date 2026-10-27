@@ -203,10 +203,44 @@ export class Engine {
     });
   }
   async submit(guild: string, actor: Actor, policyId: string, duration: number, reason: string) {
+    return this.submitLease(guild, actor, policyId, duration, reason);
+  }
+  async renew(guild: string, actor: Actor, originalId: string, duration: number, reason: string) {
+    return this.submitLease(guild, actor, undefined, duration, reason, originalId);
+  }
+  private validateRenewal(
+    parent: LeaseRequest,
+    userId: string,
+    policy: Policy,
+    now: Date,
+    duration: number,
+  ) {
+    if (parent.user_id !== userId) throw new AppError('renewal_owner_required', 403);
+    if (parent.status !== 'active' || !parent.expires_at || parent.expires_at <= now)
+      throw new AppError('renewal_lease_inactive', 409);
+    if (
+      parent.policy_id !== policy.id ||
+      parent.policy_version !== policy.version ||
+      parent.role_id !== policy.role_id
+    )
+      throw new AppError('policy_changed', 409);
+    if (now.getTime() + duration * 60000 <= parent.expires_at.getTime())
+      throw new AppError('renewal_not_longer', 409);
+  }
+  private async submitLease(
+    guild: string,
+    actor: Actor,
+    policyId: string | undefined,
+    duration: number,
+    reason: string,
+    originalId?: string,
+  ) {
     return this.db.guild(guild, async (c) => {
       const ws = await this.workspace(c, guild);
       if (ws.paused) throw new AppError('workspace_paused', 409);
-      const p = await this.policy(c, guild, policyId),
+      const parent = originalId ? await this.request(c, guild, originalId) : undefined;
+      if (parent && parent.user_id !== actor.id) throw new AppError('renewal_owner_required', 403);
+      const p = await this.policy(c, guild, parent?.policy_id ?? policyId!),
         s = await this.adapter.snapshot(guild, actor.id);
       if (!p.published || !eligible(s, p)) throw new AppError('not_eligible', 403);
       if (
@@ -220,9 +254,20 @@ export class Engine {
       assertSafeRole(s, p.role_id, p.channel_ids);
       const id = randomUUID(),
         now = await this.db.now(c, guild);
+      if (parent) {
+        this.validateRenewal(parent, actor.id, p, now, duration);
+        const binding = (
+          await c.query(
+            'SELECT phase FROM bindings WHERE guild_id=$1 AND user_id=$2 AND role_id=$3',
+            [guild, actor.id, p.role_id],
+          )
+        ).rows[0];
+        if (binding?.phase !== 'owned' || !s.member.roleIds.includes(p.role_id))
+          throw new AppError('manual_review_required', 409);
+      }
       await this.db.atomic(c, async () => {
         await c.query(
-          "INSERT INTO requests(id,guild_id,user_id,user_name,policy_id,policy_version,policy_name,role_id,reason,duration_minutes,status,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',$11,$11)",
+          "INSERT INTO requests(id,guild_id,user_id,user_name,policy_id,policy_version,policy_name,role_id,reason,duration_minutes,status,created_at,updated_at,renewal_of) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',$11,$11,$12)",
           [
             id,
             guild,
@@ -235,14 +280,19 @@ export class Engine {
             reason.trim(),
             duration,
             now,
+            parent?.id ?? null,
           ],
         );
         await this.event(
           c,
           guild,
           actor.id,
-          'requested',
-          { policyName: p.name, durationMinutes: duration },
+          parent ? 'renewal_requested' : 'requested',
+          {
+            policyName: p.name,
+            durationMinutes: duration,
+            ...(parent ? { renewalOf: parent.id, previousExpiry: parent.expires_at } : {}),
+          },
           id,
         );
       });
@@ -306,6 +356,12 @@ export class Engine {
         throw new AppError('preexisting_role', 409);
       const now = await this.db.now(c, guild),
         expires = new Date(now.getTime() + r.duration_minutes * 60000);
+      if (r.renewal_of) {
+        const parent = await this.request(c, guild, r.renewal_of);
+        this.validateRenewal(parent, r.user_id, p, now, r.duration_minutes);
+        if (!s.member.roleIds.includes(p.role_id) || binding?.phase !== 'owned')
+          throw new AppError('manual_review_required', 409);
+      }
       await this.db.atomic(c, async () => {
         await c.query(
           "UPDATE requests SET status='approved',approved_by=$1,approved_name=$2,expires_at=$3,approval_fingerprint=$4,updated_at=$5 WHERE id=$6 AND guild_id=$7",

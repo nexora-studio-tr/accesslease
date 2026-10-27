@@ -42,6 +42,79 @@ test('member requests have a working form and cannot self-approve', async ({ pag
     .click();
   await expect(page.getByRole('button', { name: 'Approve access', exact: true })).toHaveCount(0);
 });
+
+test('a holder requests a separately reviewed renewal with an unchanged original deadline', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page
+    .getByRole('button', { name: 'Inspect access: Mina Aras · Build Lab', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Approve access', exact: true }).click();
+  const rows = page
+    .locator('.ledger-table tbody tr')
+    .filter({ hasText: 'Mina Aras' })
+    .filter({ hasText: 'Build Lab' });
+  await expect(rows.getByText('Active', { exact: true })).toBeVisible();
+  const originalDeadline = await rows.locator('.time-cell span').innerText();
+  await page.getByRole('combobox', { name: 'Demo persona' }).click();
+  await page.getByRole('option', { name: 'Mina Aras · Member' }).click();
+  await page
+    .getByRole('button', { name: 'Inspect access: Mina Aras · Build Lab', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Request more time', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Request more time', exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'ACCESS PACKAGE', exact: true })).toBeDisabled();
+  await expect(page.getByRole('dialog')).toContainText(
+    'The existing deadline stays unchanged while waiting.',
+  );
+  await page
+    .getByLabel('Why do you need access?')
+    .fill('Continue release diagnostics during a separately approved term.');
+  await page.getByRole('button', { name: 'Submit request', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const renewal = rows.filter({ hasText: 'Renewal request' });
+  await expect(renewal.getByText('Awaiting review', { exact: true })).toBeVisible();
+  await expect(
+    rows.filter({ hasNotText: 'Renewal request' }).locator('.time-cell span'),
+  ).toHaveText(originalDeadline);
+  await renewal
+    .getByRole('button', { name: 'Inspect access: Mina Aras · Build Lab', exact: true })
+    .click();
+  await expect(page.getByRole('button', { name: 'Approve access', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close', exact: true }).last().click();
+  await page.getByRole('combobox', { name: 'Demo persona' }).click();
+  await page.getByRole('option', { name: /Nora Kaya/ }).click();
+  await renewal
+    .getByRole('button', { name: 'Inspect access: Mina Aras · Build Lab', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Approve access', exact: true }).click();
+  await expect(renewal.getByText('Active', { exact: true })).toBeVisible();
+  await expect(
+    rows.filter({ hasNotText: 'Renewal request' }).locator('.time-cell span'),
+  ).toHaveText(originalDeadline);
+  await page.getByRole('combobox', { name: 'Demo persona' }).click();
+  await page.getByRole('option', { name: 'Mina Aras · Member' }).click();
+  await page.getByRole('button', { name: 'Language', exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const turkishRenewal = page
+    .locator('.ledger-table tbody tr')
+    .filter({ hasText: 'Yenileme başvurusu' });
+  await turkishRenewal.getByRole('button', { name: /Erişimi incele: Mina Aras/ }).click();
+  await page.getByRole('button', { name: 'Yenileme iste', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Yenileme iste', exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog')).toContainText('Beklerken mevcut bitiş zamanı değişmez.');
+  expect(await page.getByRole('dialog').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true,
+  );
+  expect(
+    (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({ path: 'artifacts/screenshots/renewal-tr-mobile.png', fullPage: true });
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
 test('Turkish UI, mobile layout and keyboard-accessible dialogs', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
