@@ -77,6 +77,7 @@ type Lease = {
   user_id: string;
   user_name: string;
   policy_id: string;
+  renewal_of?: string | null;
   policy_name: string;
   role_id: string;
   reason: string;
@@ -130,6 +131,18 @@ async function call<T>(url: string, body?: unknown, method = 'POST'): Promise<T>
   return data as T;
 }
 const errorText: Record<string, [string, string]> = {
+  renewal_owner_required: [
+    'Only the lease holder can request more time.',
+    'Yalnızca izin sahibi yenileme isteyebilir.',
+  ],
+  renewal_lease_inactive: [
+    'The original lease ended. Cancel this renewal and request new access.',
+    'Önceki izin bitti. Bu yenilemeyi iptal edip yeni erişim iste.',
+  ],
+  renewal_not_longer: [
+    'Choose a term that ends later than the current lease.',
+    'Mevcut izinden daha sonra bitecek bir süre seç.',
+  ],
   login_required: ['Sign in to continue.', 'Devam etmek için giriş yap.'],
   self_approval_forbidden: [
     'A different person must approve this request.',
@@ -250,6 +263,7 @@ export function App() {
     [previewError, setPreviewError] = useState(''),
     [previewLoading, setPreviewLoading] = useState(false),
     [requestPolicy, setRequestPolicy] = useState<Policy | null>(null),
+    [renewalParent, setRenewalParent] = useState<Lease | null>(null),
     [requestOpen, setRequestOpen] = useState(false),
     [policyEditor, setPolicyEditor] = useState<Policy | 'new' | null>(null),
     [scenarioOpen, setScenarioOpen] = useState(false),
@@ -276,6 +290,8 @@ export function App() {
   const installSession = (s: Session) => {
     csrf = s.csrf;
     setSession(s);
+    setRenewalParent(null);
+    setRequestOpen(false);
     setData(null);
     setGuild('');
     setSelected(null);
@@ -497,6 +513,10 @@ export function App() {
   const eventName = (kind: string) =>
     ({
       requested: lang === 'en' ? 'Access requested' : 'Erişim istendi',
+      renewal_requested:
+        lang === 'en'
+          ? 'Renewal requested · separate review required'
+          : 'Yenileme istendi · ayrı onay gerekli',
       approved: lang === 'en' ? 'Reviewed and approved' : 'İncelendi ve onaylandı',
       access_granted: lang === 'en' ? 'Role granted and verified' : 'Rol verildi ve doğrulandı',
       lease_closed: lang === 'en' ? 'Lease ended; result recorded' : 'İzin bitti, sonuç kaydedildi',
@@ -652,7 +672,7 @@ export function App() {
             </DropdownMenu.Content>
           </DropdownMenu.Root>
           <div className="version">
-            NEXORA STUDIO <span>α 0.1.0</span>
+            NEXORA STUDIO <span>0.1.0-alpha.2</span>
           </div>
         </div>
       </aside>
@@ -733,6 +753,7 @@ export function App() {
                           size="3"
                           onClick={() => {
                             setRequestPolicy(data.policies.find((p) => p.canRequest) ?? null);
+                            setRenewalParent(null);
                             setRequestOpen(true);
                           }}
                           disabled={
@@ -848,6 +869,11 @@ export function App() {
                                       <KeyRound size={12} />
                                       {r.policy_name}
                                     </span>
+                                    {r.renewal_of && (
+                                      <Badge color="amber" variant="soft">
+                                        {t.renewal}
+                                      </Badge>
+                                    )}
                                   </td>
                                   <td className="time-cell">
                                     <span>
@@ -963,6 +989,7 @@ export function App() {
                             disabled={!p.canRequest || data.workspace.paused}
                             onClick={() => {
                               setRequestPolicy(p);
+                              setRenewalParent(null);
                               setRequestOpen(true);
                             }}
                           >
@@ -1089,6 +1116,11 @@ export function App() {
               <Dialog.Description className="muted">
                 {selectedFresh.user_name} · {date(selectedFresh.created_at)}
               </Dialog.Description>
+              {selectedFresh.renewal_of && (
+                <p className="inline-alert">
+                  {t.renewal} · {t.renewalHint}
+                </p>
+              )}
               <div className="detail-meta">
                 {stamp(status(selectedFresh))}
                 <span>
@@ -1119,9 +1151,9 @@ export function App() {
                   {permissionRows(preview.removal, true)}
                   {preview.self && <p className="inline-alert">{t.own}</p>}
                   {preview.stalePolicy && <p className="inline-alert">{t.stale}</p>}
-                  {preview.alreadyPresent && selectedFresh.status === 'pending' && (
-                    <p className="inline-alert">{t.preexisting}</p>
-                  )}
+                  {preview.alreadyPresent &&
+                    selectedFresh.status === 'pending' &&
+                    !selectedFresh.renewal_of && <p className="inline-alert">{t.preexisting}</p>}
                 </>
               )}
               {selectedFresh.result && (
@@ -1156,6 +1188,25 @@ export function App() {
                   ))}
               </div>
               <div className="dialog-actions">
+                {selectedFresh.status === 'active' &&
+                  selectedFresh.user_id === session.actor.id &&
+                  data?.policies.find((p) => p.id === selectedFresh.policy_id)?.canRequest && (
+                    <Button
+                      variant="soft"
+                      disabled={busy || data.workspace.paused}
+                      onClick={() => {
+                        setRenewalParent(selectedFresh);
+                        setRequestPolicy(
+                          data.policies.find((p) => p.id === selectedFresh.policy_id) ?? null,
+                        );
+                        setSelected(null);
+                        setRequestOpen(true);
+                      }}
+                    >
+                      {t.renew}
+                      <ArrowRight size={15} />
+                    </Button>
+                  )}
                 {selectedFresh.status === 'pending' && (
                   <>
                     {data?.policies.find((p) => p.id === selectedFresh.policy_id)?.canReview && (
@@ -1289,15 +1340,28 @@ export function App() {
       </Dialog.Root>
       <RequestDialog
         open={requestOpen}
-        onClose={() => setRequestOpen(false)}
+        onClose={() => {
+          setRequestOpen(false);
+          setRenewalParent(null);
+        }}
         policies={data?.policies.filter((p) => p.canRequest) ?? []}
         initial={requestPolicy}
+        renewal={renewalParent}
         t={t}
         busy={busy}
         onSubmit={(b) =>
           void act(
-            () => call(`${path}/requests`, b),
-            () => setRequestOpen(false),
+            () =>
+              renewalParent
+                ? call(`${path}/requests/${renewalParent.id}/renew`, {
+                    durationMinutes: b.durationMinutes,
+                    reason: b.reason,
+                  })
+                : call(`${path}/requests`, b),
+            () => {
+              setRequestOpen(false);
+              setRenewalParent(null);
+            },
           )
         }
       />
@@ -1441,6 +1505,7 @@ function RequestDialog({
   onClose,
   policies,
   initial,
+  renewal,
   t,
   busy,
   onSubmit,
@@ -1449,6 +1514,7 @@ function RequestDialog({
   onClose: () => void;
   policies: Policy[];
   initial: Policy | null;
+  renewal: Lease | null;
   t: T;
   busy: boolean;
   onSubmit: (b: { policyId: string; durationMinutes: number; reason: string }) => void;
@@ -1460,10 +1526,12 @@ function RequestDialog({
     if (open) {
       const p = initial ?? policies[0];
       setId(p?.id ?? '');
-      setDuration(String(Math.min(p?.max_minutes ?? 1440, 1440)));
+      setDuration(
+        String(renewal ? (p?.max_minutes ?? 1440) : Math.min(p?.max_minutes ?? 1440, 1440)),
+      );
       setReason('');
     }
-  }, [open, initial]);
+  }, [open, initial, renewal]);
   const p = policies.find((p) => p.id === id);
   const durations = [5, 30, 60, 120, 1440, 2880, 4320, 10080].filter(
     (v) => v <= (p?.max_minutes ?? 0),
@@ -1476,8 +1544,16 @@ function RequestDialog({
       }}
     >
       <Dialog.Content maxWidth="500px">
-        <Dialog.Title>{t.request}</Dialog.Title>
-        <Dialog.Description>{t.expiryNote}</Dialog.Description>
+        <Dialog.Title>{renewal ? t.renew : t.request}</Dialog.Title>
+        <Dialog.Description>{renewal ? t.renewalHint : t.expiryNote}</Dialog.Description>
+        {renewal?.expires_at && (
+          <p className="muted">
+            {t.originalEnds}:{' '}
+            <time dateTime={renewal.expires_at}>
+              {new Date(renewal.expires_at).toLocaleString(t === copy.tr ? 'tr-TR' : 'en-GB')}
+            </time>
+          </p>
+        )}
         <form
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
@@ -1488,6 +1564,7 @@ function RequestDialog({
             <label htmlFor="request-package">{t.package}</label>
             <Select.Root
               value={id}
+              disabled={!!renewal}
               onValueChange={(id) => {
                 setId(id);
                 setDuration(
@@ -1508,7 +1585,13 @@ function RequestDialog({
             <Select.Root value={duration} onValueChange={setDuration}>
               <Select.Trigger id="request-duration" aria-label={t.duration} />
               <Select.Content>
-                {[...new Set([...durations, Math.min(p?.max_minutes ?? 1440, 1440)])]
+                {[
+                  ...new Set([
+                    ...durations,
+                    Math.min(p?.max_minutes ?? 1440, 1440),
+                    ...(renewal && p ? [p.max_minutes] : []),
+                  ]),
+                ]
                   .sort((a, b) => a - b)
                   .map((v) => (
                     <Select.Item key={v} value={String(v)}>

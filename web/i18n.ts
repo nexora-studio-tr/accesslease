@@ -11,6 +11,11 @@ export const copy = {
     title: 'Every permission\nhas a purpose.',
     subtitle: 'Give the right people a way in. Know when their access really ends.',
     request: 'Request access',
+    renew: 'Request more time',
+    renewal: 'Renewal request',
+    renewalHint:
+      'Request a new term starting at approval. Another person must review it. The existing deadline stays unchanged while waiting.',
+    originalEnds: 'Original lease ends',
     pending: 'Awaiting review',
     active: 'Active',
     closed: 'Ended',
@@ -139,6 +144,11 @@ export const copy = {
     title: 'Her yetkinin\nbir nedeni var.',
     subtitle: 'Doğru kişilere kapıyı aç. Erişimin gerçekten ne zaman kapandığını bil.',
     request: 'Erişim iste',
+    renew: 'Yenileme iste',
+    renewal: 'Yenileme başvurusu',
+    renewalHint:
+      'Onay anında başlayacak yeni bir süre iste. Başka bir kişi incelemeli. Beklerken mevcut bitiş zamanı değişmez.',
+    originalEnds: 'Önceki iznin bitişi',
     pending: 'Onay bekliyor',
     active: 'Etkin',
     closed: 'Sona erdi',

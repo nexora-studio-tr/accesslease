@@ -4,7 +4,7 @@
 
 Discord ekipleri için gerekçeli başvuru, ayrı kişi onayı, açıklanabilir izin önizlemesi ve doğrulanan süre sonu.
 
-[English](README.md) · [Kurulum](docs/SETUP.tr.md) · [Mimari](docs/ARCHITECTURE.md) · [Güvenlik](SECURITY.md) · [Doğrulama durumu](docs/VALIDATION.md)
+[English](README.md) · [Kurulum](docs/SETUP.tr.md) · [Yenileme](docs/RENEWALS.md#türkçe) · [Mimari](docs/ARCHITECTURE.md) · [Güvenlik](SECURITY.md) · [Doğrulama durumu](docs/VALIDATION.md)
 
 ![Örnek verilerle AccessLease erişim defteri](docs/images/ledger-en.png)
 
@@ -18,6 +18,7 @@ Başka bir rol erişimi açık bırakıyorsa bunu da gösterir. **Rolün kaldır
 
 - Kanal görünürlüğü, yazma ve ses izinleri için önce/sonra karşılaştırması.
 - Sunucu sahibi dahil herkes için ayrı bir onaylayıcı gereksinimi.
+- Mevcut izne bağlı yenileme başvurusu; başka biri onaylayana kadar eski bitiş zamanı geçerlidir.
 - Önceden var olan rolleri koruma; çakışan izinlerin sonuncusu bitene kadar rolü tutma.
 - Yönetici müdahalesini ezmeden çakışma incelemesi.
 - PostgreSQL üzerinde kalıcı işler, değişmeyen bitiş zamanı, yeniden deneme ve kesinti sonrası kontrol.

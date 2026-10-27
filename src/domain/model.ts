@@ -48,6 +48,7 @@ export type LeaseRequest = {
   user_name: string;
   policy_id: string;
   policy_version: number;
+  renewal_of: string | null;
   policy_name: string;
   role_id: string;
   reason: string;
